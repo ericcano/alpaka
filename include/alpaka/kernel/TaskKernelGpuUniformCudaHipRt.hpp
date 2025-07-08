@@ -9,6 +9,7 @@
 #include "alpaka/acc/Traits.hpp"
 #include "alpaka/core/BoostPredef.hpp"
 #include "alpaka/core/Cuda.hpp"
+#include "alpaka/core/CudaSingleThread.hpp"
 #include "alpaka/core/Decay.hpp"
 #include "alpaka/core/DemangleTypeNames.hpp"
 #include "alpaka/core/Hip.hpp"
@@ -248,35 +249,39 @@ namespace alpaka
                           << " sharedSizeBytes: " << funcAttrs.sharedSizeBytes << " B" << std::endl;
 #        endif
 
-                // Set the current device.
-                ALPAKA_UNIFORM_CUDA_HIP_RT_CHECK(TApi::setDevice(queue.m_spQueueImpl->m_dev.getNativeHandle()));
-                // Enqueue the kernel execution.
-                // \NOTE: No const reference (const &) is allowed as the parameter type because the kernel launch
-                // language extension expects the arguments by value. This forces the type of a float argument given
-                // with std::forward to this function to be of type float instead of e.g. "float const & __ptr64"
-                // (MSVC). If not given by value, the kernel launch code does not copy the value but the pointer to the
-                // value location.
-                std::apply(
-                    [&](remove_restrict_t<ALPAKA_DECAY_T(TArgs)> const&... args)
+                alpaka::cuda::detail::SingleThread::post(
+                    [=]()
                     {
-                        kernelName<<<
-                            gridDim,
-                            blockDim,
-                            static_cast<std::size_t>(blockSharedMemDynSizeBytes),
-                            queue.getNativeHandle()>>>(threadElemExtent, task.m_kernelFnObj, args...);
-                    },
-                    task.m_args);
+                        // Set the current device.
+                        ALPAKA_UNIFORM_CUDA_HIP_RT_CHECK(TApi::setDevice(queue.m_spQueueImpl->m_dev.getNativeHandle()));
+                        // Enqueue the kernel execution.
+                        // \NOTE: No const reference (const &) is allowed as the parameter type because the kernel launch
+                        // language extension expects the arguments by value. This forces the type of a float argument given
+                        // with std::forward to this function to be of type float instead of e.g. "float const & __ptr64"
+                        // (MSVC). If not given by value, the kernel launch code does not copy the value but the pointer to the
+                        // value location.
+                        std::apply(
+                            [&](remove_restrict_t<ALPAKA_DECAY_T(TArgs)> const&... args)
+                            {
+                                kernelName<<<
+                                    gridDim,
+                                    blockDim,
+                                    static_cast<std::size_t>(blockSharedMemDynSizeBytes),
+                                    queue.getNativeHandle()>>>(threadElemExtent, task.m_kernelFnObj, args...);
+                            },
+                            task.m_args);
 
-                if constexpr(ALPAKA_DEBUG >= ALPAKA_DEBUG_MINIMAL)
-                {
-                    // Wait for the kernel execution to finish but do not check error return of this call.
-                    // Do not use the alpaka::wait method because it checks the error itself but we want to give a
-                    // custom error message.
-                    std::ignore = TApi::streamSynchronize(queue.getNativeHandle());
-                    auto const msg = std::string{
-                        "'execution of kernel: '" + std::string{core::demangled<TKernelFnObj>} + "' failed with"};
-                    ::alpaka::uniform_cuda_hip::detail::rtCheckLastError<TApi, true>(msg.c_str(), __FILE__, __LINE__);
-                }
+                        if constexpr(ALPAKA_DEBUG >= ALPAKA_DEBUG_MINIMAL)
+                        {
+                            // Wait for the kernel execution to finish but do not check error return of this call.
+                            // Do not use the alpaka::wait method because it checks the error itself but we want to give a
+                            // custom error message.
+                            std::ignore = TApi::streamSynchronize(queue.getNativeHandle());
+                            auto const msg = std::string{
+                                "'execution of kernel: '" + std::string{core::demangled<TKernelFnObj>} + "' failed with"};
+                            ::alpaka::uniform_cuda_hip::detail::rtCheckLastError<TApi, true>(msg.c_str(), __FILE__, __LINE__);
+                        }
+                    });
             }
         };
 
@@ -356,31 +361,36 @@ namespace alpaka
                           << " sharedSizeBytes: " << funcAttrs.sharedSizeBytes << " B" << std::endl;
 #        endif
 
-                // Set the current device.
-                ALPAKA_UNIFORM_CUDA_HIP_RT_CHECK(TApi::setDevice(queue.m_spQueueImpl->m_dev.getNativeHandle()));
-
-                // Enqueue the kernel execution.
-                std::apply(
-                    [&](remove_restrict_t<ALPAKA_DECAY_T(TArgs)> const&... args)
+                alpaka::cuda::detail::SingleThread::post(
+                    [=]()
                     {
-                        kernelName<<<
-                            gridDim,
-                            blockDim,
-                            static_cast<std::size_t>(blockSharedMemDynSizeBytes),
-                            queue.getNativeHandle()>>>(threadElemExtent, task.m_kernelFnObj, args...);
-                    },
-                    task.m_args);
 
-                // Wait for the kernel execution to finish but do not check error return of this call.
-                // Do not use the alpaka::wait method because it checks the error itself but we want to give a custom
-                // error message.
-                std::ignore = TApi::streamSynchronize(queue.getNativeHandle());
-                if constexpr(ALPAKA_DEBUG >= ALPAKA_DEBUG_MINIMAL)
-                {
-                    auto const msg
-                        = std::string{"'execution of kernel: '" + core::demangled<TKernelFnObj> + "' failed with"};
-                    ::alpaka::uniform_cuda_hip::detail::rtCheckLastError<TApi, true>(msg.c_str(), __FILE__, __LINE__);
-                }
+                        // Set the current device.
+                        ALPAKA_UNIFORM_CUDA_HIP_RT_CHECK(TApi::setDevice(queue.m_spQueueImpl->m_dev.getNativeHandle()));
+
+                        // Enqueue the kernel execution.
+                        std::apply(
+                            [&](remove_restrict_t<ALPAKA_DECAY_T(TArgs)> const&... args)
+                            {
+                                kernelName<<<
+                                    gridDim,
+                                    blockDim,
+                                    static_cast<std::size_t>(blockSharedMemDynSizeBytes),
+                                    queue.getNativeHandle()>>>(threadElemExtent, task.m_kernelFnObj, args...);
+                            },
+                            task.m_args);
+
+                        // Wait for the kernel execution to finish but do not check error return of this call.
+                        // Do not use the alpaka::wait method because it checks the error itself but we want to give a custom
+                        // error message.
+                        std::ignore = TApi::streamSynchronize(queue.getNativeHandle());
+                        if constexpr(ALPAKA_DEBUG >= ALPAKA_DEBUG_MINIMAL)
+                        {
+                            auto const msg
+                                = std::string{"'execution of kernel: '" + core::demangled<TKernelFnObj> + "' failed with"};
+                            ::alpaka::uniform_cuda_hip::detail::rtCheckLastError<TApi, true>(msg.c_str(), __FILE__, __LINE__);
+                        }
+                    });
             }
         };
     } // namespace trait

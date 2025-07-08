@@ -5,6 +5,7 @@
 #pragma once
 
 #include <boost/predef.h>
+#include "alpaka/core/CudaSingleThread.hpp"
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
 #    include <cuda_runtime_api.h>
@@ -150,7 +151,11 @@ namespace alpaka
 
         static inline Error_t eventRecord(Event_t event, Stream_t stream)
         {
-            return ::cudaEventRecord(event, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaEventRecord(event, stream);
+                    });
+            return success;
         }
 
         static inline Error_t eventSynchronize(Event_t event)
@@ -166,7 +171,12 @@ namespace alpaka
         static inline Error_t freeAsync([[maybe_unused]] void* devPtr, [[maybe_unused]] Stream_t stream)
         {
 #    if CUDART_VERSION >= 11020
-            return ::cudaFreeAsync(devPtr, stream);
+
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaFreeAsync(devPtr, stream);
+                    });
+            return success;
 #    else
             // Not implemented.
             return errorUnknown;
@@ -249,10 +259,18 @@ namespace alpaka
         {
 #    if CUDART_VERSION >= 10000
             // Wrap the host function using the proper calling convention
-            return ::cudaLaunchHostFunc(stream, HostFnAdaptor::hostFunction, new HostFnAdaptor{fn, userData});
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaLaunchHostFunc(stream, HostFnAdaptor::hostFunction, new HostFnAdaptor{fn, userData});
+                    });
+            return success;
 #    else
             // Emulate cudaLaunchHostFunc using cudaStreamAddCallback with a callback adaptor.
-            return ::cudaStreamAddCallback(stream, HostFnAdaptor::streamCallback, new HostFnAdaptor{fn, userData}, 0);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaStreamAddCallback(stream, HostFnAdaptor::streamCallback, new HostFnAdaptor{fn, userData}, 0);
+                    });
+            return success;
 #    endif
         }
 
@@ -272,7 +290,11 @@ namespace alpaka
             [[maybe_unused]] Stream_t stream)
         {
 #    if CUDART_VERSION >= 11020
-            return ::cudaMallocAsync(devPtr, size, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaMallocAsync(devPtr, size, stream);
+                    });
+            return success;
 #    else
             // Not implemented.
             return errorUnknown;
@@ -304,17 +326,29 @@ namespace alpaka
             MemcpyKind_t kind,
             Stream_t stream)
         {
-            return ::cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+                    });
+            return success;
         }
 
         static inline Error_t memcpy3DAsync(Memcpy3DParms_t const* p, Stream_t stream)
         {
-            return ::cudaMemcpy3DAsync(p, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaMemcpy3DAsync(p, stream);
+                    });
+            return success;
         }
 
         static inline Error_t memcpyAsync(void* dst, void const* src, size_t count, MemcpyKind_t kind, Stream_t stream)
         {
-            return ::cudaMemcpyAsync(dst, src, count, kind, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaMemcpyAsync(dst, src, count, kind, stream);
+                    });
+            return success;
         }
 
         static inline Error_t memset2DAsync(
@@ -325,17 +359,29 @@ namespace alpaka
             size_t height,
             Stream_t stream)
         {
-            return ::cudaMemset2DAsync(devPtr, pitch, value, width, height, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaMemset2DAsync(devPtr, pitch, value, width, height, stream);
+                    });
+            return success;
         }
 
         static inline Error_t memset3DAsync(PitchedPtr_t pitchedDevPtr, int value, Extent_t extent, Stream_t stream)
         {
-            return ::cudaMemset3DAsync(pitchedDevPtr, value, extent, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaMemset3DAsync(pitchedDevPtr, value, extent, stream);
+                    });
+            return success;
         }
 
         static inline Error_t memsetAsync(void* devPtr, int value, size_t count, Stream_t stream)
         {
-            return ::cudaMemsetAsync(devPtr, value, count, stream);
+            alpaka::cuda::detail::SingleThread::post(
+                    [=]()
+                    { ::cudaMemsetAsync(devPtr, value, count, stream);
+                    });
+            return success;
         }
 
         static inline Error_t setDevice(int device)
