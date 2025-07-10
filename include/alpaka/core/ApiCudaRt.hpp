@@ -34,6 +34,9 @@ namespace alpaka
         using Pos_t = ::cudaPos;
         using Stream_t = ::cudaStream_t;
 
+        // Aliases
+        using CUDAThread = alpaka::cuda::detail::SingleThread;
+
         // Constants
         static constexpr Error_t success = ::cudaSuccess;
         static constexpr Error_t errorNotReady = ::cudaErrorNotReady;
@@ -106,77 +109,94 @@ namespace alpaka
         // Runtime API
         static inline Error_t deviceGetAttribute(int* value, DeviceAttr_t attr, int device)
         {
-            return ::cudaDeviceGetAttribute(value, attr, device);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaDeviceGetAttribute(value, attr, device);
+            });
         }
 
         static inline Error_t deviceGetLimit(size_t* pValue, Limit_t limit)
         {
-            return ::cudaDeviceGetLimit(pValue, limit);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaDeviceGetLimit(pValue, limit);
+            });
         }
 
         static inline Error_t deviceReset()
         {
-            return ::cudaDeviceReset();
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaDeviceReset();
+            });
         }
 
         static inline Error_t deviceSetLimit(Limit_t limit, size_t value)
         {
-            return ::cudaDeviceSetLimit(limit, value);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaDeviceSetLimit(limit, value);
+            });
         }
 
         static inline Error_t deviceSynchronize()
         {
-            return ::cudaDeviceSynchronize();
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaDeviceSynchronize();
+            });
         }
 
         static inline Error_t eventCreate(Event_t* event)
         {
-            return ::cudaEventCreate(event);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaEventCreate(event);
+            });
         }
 
         static inline Error_t eventCreateWithFlags(Event_t* event, Flag_t flags)
         {
-            return ::cudaEventCreateWithFlags(event, flags);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaEventCreateWithFlags(event, flags);
+            });
         }
 
         static inline Error_t eventDestroy(Event_t event)
         {
-            return ::cudaEventDestroy(event);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaEventDestroy(event);
+            });
         }
 
         static inline Error_t eventQuery(Event_t event)
         {
-            return ::cudaEventQuery(event);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaEventQuery(event);
+            });
         }
 
         static inline Error_t eventRecord(Event_t event, Stream_t stream)
         {
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaEventRecord(event, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaEventRecord(event, stream);
+            });
         }
 
         static inline Error_t eventSynchronize(Event_t event)
         {
-            return ::cudaEventSynchronize(event);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaEventSynchronize(event);
+            });
         }
 
         static inline Error_t free(void* devPtr)
         {
-            return ::cudaFree(devPtr);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaFree(devPtr);
+            });
         }
 
         static inline Error_t freeAsync([[maybe_unused]] void* devPtr, [[maybe_unused]] Stream_t stream)
         {
 #    if CUDART_VERSION >= 11020
-
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaFreeAsync(devPtr, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaFreeAsync(devPtr, stream);
+            });
 #    else
             // Not implemented.
             return errorUnknown;
@@ -185,103 +205,127 @@ namespace alpaka
 
         static inline Error_t funcGetAttributes(FuncAttributes_t* attr, void const* func)
         {
-            return ::cudaFuncGetAttributes(attr, func);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaFuncGetAttributes(attr, func);
+            });
         }
 
         template<typename T>
         static inline Error_t funcGetAttributes(FuncAttributes_t* attr, T* func)
         {
-            return ::cudaFuncGetAttributes(attr, reinterpret_cast<void const*>(func));
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaFuncGetAttributes(attr, reinterpret_cast<void const*>(func));
+            });
         }
 
         static inline Error_t getDeviceCount(int* count)
         {
-            return ::cudaGetDeviceCount(count);
+             return ::cudaGetDeviceCount(count);
         }
 
         static inline Error_t getDeviceProperties(DeviceProp_t* prop, int device)
         {
-            return ::cudaGetDeviceProperties(prop, device);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaGetDeviceProperties(prop, device);
+            });
         }
 
         static inline char const* getErrorName(Error_t error)
         {
-            return ::cudaGetErrorName(error);
+            return CUDAThread::postAndReturn<char const*>([=]() mutable {
+                return ::cudaGetErrorName(error);
+            });
         }
 
         static inline char const* getErrorString(Error_t error)
         {
-            return ::cudaGetErrorString(error);
+            return CUDAThread::postAndReturn<char const*>([=]() mutable {
+                return ::cudaGetErrorString(error);
+            });
         }
 
         static inline Error_t getLastError()
         {
-            return ::cudaGetLastError();
+             return ::cudaGetLastError();
         }
 
         static inline Error_t getSymbolAddress(void** devPtr, void const* symbol)
         {
-            return ::cudaGetSymbolAddress(devPtr, symbol);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaGetSymbolAddress(devPtr, symbol);
+            });
         }
 
         template<class T>
         static inline Error_t getSymbolAddress(void** devPtr, T const& symbol)
         {
-            return ::cudaGetSymbolAddress(devPtr, symbol);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaGetSymbolAddress(devPtr, symbol);
+            });
         }
 
         static inline Error_t hostGetDevicePointer(void** pDevice, void* pHost, Flag_t flags)
         {
-            return ::cudaHostGetDevicePointer(pDevice, pHost, flags);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaHostGetDevicePointer(pDevice, pHost, flags);
+            });
         }
 
         static inline Error_t hostFree(void* ptr)
         {
-            return ::cudaFreeHost(ptr);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaFreeHost(ptr);
+            });
         }
 
         static inline Error_t hostMalloc(void** ptr, size_t size, Flag_t flags)
         {
-            return ::cudaHostAlloc(ptr, size, flags);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaHostAlloc(ptr, size, flags);
+            });
         }
 
         static inline Error_t hostRegister(void* ptr, size_t size, Flag_t flags)
         {
-            return ::cudaHostRegister(ptr, size, flags);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaHostRegister(ptr, size, flags);
+            });
         }
 
         static inline Error_t hostUnregister(void* ptr)
         {
-            return ::cudaHostUnregister(ptr);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaHostUnregister(ptr);
+            });
         }
 
         static inline Error_t launchHostFunc(Stream_t stream, HostFn_t fn, void* userData)
         {
 #    if CUDART_VERSION >= 10000
             // Wrap the host function using the proper calling convention
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaLaunchHostFunc(stream, HostFnAdaptor::hostFunction, new HostFnAdaptor{fn, userData});
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaLaunchHostFunc(stream, HostFnAdaptor::hostFunction, new HostFnAdaptor{fn, userData});
+            });
 #    else
             // Emulate cudaLaunchHostFunc using cudaStreamAddCallback with a callback adaptor.
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaStreamAddCallback(stream, HostFnAdaptor::streamCallback, new HostFnAdaptor{fn, userData}, 0);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaStreamAddCallback(stream, HostFnAdaptor::streamCallback, new HostFnAdaptor{fn, userData}, 0);
+            });
 #    endif
         }
 
         static inline Error_t malloc(void** devPtr, size_t size)
         {
-            return ::cudaMalloc(devPtr, size);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMalloc(devPtr, size);
+            });
         }
 
         static inline Error_t malloc3D(PitchedPtr_t* pitchedDevPtr, Extent_t extent)
         {
-            return ::cudaMalloc3D(pitchedDevPtr, extent);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMalloc3D(pitchedDevPtr, extent);
+            });
         }
 
         static inline Error_t mallocAsync(
@@ -290,11 +334,9 @@ namespace alpaka
             [[maybe_unused]] Stream_t stream)
         {
 #    if CUDART_VERSION >= 11020
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaMallocAsync(devPtr, size, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMallocAsync(devPtr, size, stream);
+            });
 #    else
             // Not implemented.
             return errorUnknown;
@@ -303,17 +345,23 @@ namespace alpaka
 
         static inline Error_t mallocPitch(void** devPtr, size_t* pitch, size_t width, size_t height)
         {
-            return ::cudaMallocPitch(devPtr, pitch, width, height);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMallocPitch(devPtr, pitch, width, height);
+            });
         }
 
         static inline Error_t memGetInfo(size_t* free, size_t* total)
         {
-            return ::cudaMemGetInfo(free, total);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemGetInfo(free, total);
+            });
         }
 
         static inline Error_t memcpy(void* dst, void const* src, size_t count, MemcpyKind_t kind)
         {
-            return ::cudaMemcpy(dst, src, count, kind);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemcpy(dst, src, count, kind);
+            });
         }
 
         static inline Error_t memcpy2DAsync(
@@ -326,29 +374,23 @@ namespace alpaka
             MemcpyKind_t kind,
             Stream_t stream)
         {
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+            });
         }
 
         static inline Error_t memcpy3DAsync(Memcpy3DParms_t const* p, Stream_t stream)
         {
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaMemcpy3DAsync(p, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemcpy3DAsync(p, stream);
+            });
         }
 
         static inline Error_t memcpyAsync(void* dst, void const* src, size_t count, MemcpyKind_t kind, Stream_t stream)
         {
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaMemcpyAsync(dst, src, count, kind, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemcpyAsync(dst, src, count, kind, stream);
+            });
         }
 
         static inline Error_t memset2DAsync(
@@ -359,64 +401,72 @@ namespace alpaka
             size_t height,
             Stream_t stream)
         {
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaMemset2DAsync(devPtr, pitch, value, width, height, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemset2DAsync(devPtr, pitch, value, width, height, stream);
+            });
         }
 
         static inline Error_t memset3DAsync(PitchedPtr_t pitchedDevPtr, int value, Extent_t extent, Stream_t stream)
         {
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaMemset3DAsync(pitchedDevPtr, value, extent, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemset3DAsync(pitchedDevPtr, value, extent, stream);
+            });
         }
 
         static inline Error_t memsetAsync(void* devPtr, int value, size_t count, Stream_t stream)
         {
-            alpaka::cuda::detail::SingleThread::post(
-                    [=]()
-                    { ::cudaMemsetAsync(devPtr, value, count, stream);
-                    });
-            return success;
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaMemsetAsync(devPtr, value, count, stream);
+            });
         }
 
         static inline Error_t setDevice(int device)
         {
-            return ::cudaSetDevice(device);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaSetDevice(device);
+            });
         }
 
         static inline Error_t streamCreate(Stream_t* pStream)
         {
-            return ::cudaStreamCreate(pStream);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaStreamCreate(pStream);
+            });
         }
 
         static inline Error_t streamCreateWithFlags(Stream_t* pStream, Flag_t flags)
         {
-            return ::cudaStreamCreateWithFlags(pStream, flags);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaStreamCreateWithFlags(pStream, flags);
+            });
         }
 
         static inline Error_t streamDestroy(Stream_t stream)
         {
-            return ::cudaStreamDestroy(stream);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaStreamDestroy(stream);
+            });
         }
 
         static inline Error_t streamQuery(Stream_t stream)
         {
-            return ::cudaStreamQuery(stream);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaStreamQuery(stream);
+            });
         }
 
         static inline Error_t streamSynchronize(Stream_t stream)
         {
-            return ::cudaStreamSynchronize(stream);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaStreamSynchronize(stream);
+            });
         }
 
         static inline Error_t streamWaitEvent(Stream_t stream, Event_t event, Flag_t flags)
         {
-            return ::cudaStreamWaitEvent(stream, event, flags);
+            return CUDAThread::postAndReturn<Error_t>([=]() mutable {
+                return ::cudaStreamWaitEvent(stream, event, flags);
+            });
         }
 
         static inline PitchedPtr_t makePitchedPtr(void* d, size_t p, size_t xsz, size_t ysz)
