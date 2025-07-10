@@ -81,7 +81,7 @@
 #    define ALPAKA_FN_INLINE __forceinline
 #else
 // For gcc, clang, and clang-based compilers like Intel icpx
-#    define ALPAKA_FN_INLINE [[gnu::always_inline]] inline
+#    define ALPAKA_FN_INLINE /*[[gnu::always_inline]]*/ inline
 #endif
 
 //! This macro defines a variable lying in global accelerator device memory.
