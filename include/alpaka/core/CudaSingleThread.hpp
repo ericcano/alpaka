@@ -4,28 +4,80 @@
 
  #pragma once
 
-#include <tbb/task_arena.h>
-#include <tbb/task_group.h>
+#include <tbb/concurrent_queue.h>
 #include <functional>
 #include <future>
 #include <iostream>
 #include <mutex>
-#include <utility>
 #include <thread>
+#include <atomic>
+#include <utility>
+#include <sys/syscall.h>
 #include <unistd.h>
+#include <sstream>
+#include <iomanip>
 
 namespace alpaka::cuda::detail {
 
+// Dedicated worker for single-threaded task execution
+class SingleThreadWorker {
+public:
+    struct Task {
+        std::function<void()> func;
+        bool terminate = false;
+    };
+
+    SingleThreadWorker() : m_running(true) {
+        m_thread = std::thread([this] {
+            while (m_running) {
+                Task task;
+                if (m_queue.try_pop(task)) {
+                    if (task.terminate) break;
+                    task.func();
+                } else {
+                    std::this_thread::yield();
+                }
+            }
+        });
+    }
+
+    ~SingleThreadWorker() {
+        // Enqueue termination task
+        m_queue.push(Task{[] {}, true});
+        m_running = false;
+        if (m_thread.joinable()) {
+            m_thread.join();
+        }
+    }
+
+    void post(Task&& task) {
+        m_queue.push(std::move(task));
+    }
+
+private:
+    tbb::concurrent_queue<Task> m_queue;
+    std::thread m_thread;
+    std::atomic<bool> m_running;
+};
+
 class SingleThread {
 private:
-    // Post a callable to the single-threaded CUDA TBB arena
+    SingleThread() = default;
+    ~SingleThread() = default;
+
+    static SingleThread& getInstance() {
+        static SingleThread instance;
+        return instance;
+    }
+
+    SingleThreadWorker m_worker;
+
     template<typename F>
     static void post(F&& f) {
-        auto& instance = getInstance();
-        // Use shared_ptr to ensure copyability
         auto f_ptr = std::make_shared<std::decay_t<F>>(std::forward<F>(f));
-        instance.m_arena.enqueue([&instance, f_ptr]() {
-            instance.m_group.run([f_ptr]() { (*f_ptr)(); });
+        getInstance().m_worker.post(SingleThreadWorker::Task{
+            [f_ptr]() { (*f_ptr)(); },
+            false
         });
     }
 
@@ -36,8 +88,8 @@ public:
         auto future = promise.get_future();
 
         post([promise_ptr = &promise, func = std::forward<F>(f)]() mutable {
-            std::cout << "Lambda START [" << promise_ptr << "] (thread 0x" << std::hex << std::this_thread::get_id() 
-                 << "/"  << std::dec << gettid() << ")" << std::endl;
+            // std::cout << "Lambda START [" << promise_ptr << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+            //      << "/"  << std::dec << gettid() << ")" << std::endl;
             try {
                 if constexpr (std::is_void_v<R>) {
                     func();
@@ -48,39 +100,23 @@ public:
             } catch (...) {
                 promise_ptr->set_exception(std::current_exception());
             }
-            std::cout << "Lambda END [" << promise_ptr << "] (thread 0x" << std::hex << std::this_thread::get_id() 
-                 << "/"  << std::dec << gettid() << ")" << std::endl;
+            // std::cout << "Lambda END [" << promise_ptr << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+            //      << "/"  << std::dec << gettid() << ")" << std::endl;
         });
 
-        std::cout << "Waiting on promise [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
-                 << "/"  << std::dec << gettid() << ")" << std::endl;
+        // std::cout << "Waiting on promise [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+        //          << "/"  << std::dec << gettid() << ")" << std::endl;
         if constexpr (std::is_void_v<R>) {
             future.wait();
-            std::cout << "Promise fulfilled [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
-                     << "/"  << std::dec << gettid() << ")" << std::endl;
+            // std::cout << "Promise fulfilled [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+            //          << "/"  << std::dec << gettid() << ")" << std::endl;
             return;
         } else { 
            R ret = future.get();
-           std::cout << "Promise fulfilled [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
-                     << "/"  << std::dec << gettid() << ")" << std::endl;
+        //    std::cout << "Promise fulfilled [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+        //              << "/"  << std::dec << gettid() << ")" << std::endl;
            return ret;
         }
     }
-
-    ~SingleThread() {
-        m_group.wait();
-    } 
-
-private:
-    SingleThread() : m_arena(1) {}
-
-    static SingleThread& getInstance() {
-        static SingleThread instance;
-        return instance;
-    }
-
-    tbb::task_arena m_arena;
-    tbb::task_group m_group;
 };
-
 } // namespace alpaka::cuda::detail
