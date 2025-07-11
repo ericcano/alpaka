@@ -9,6 +9,7 @@
 #include "alpaka/acc/Traits.hpp"
 #include "alpaka/core/BoostPredef.hpp"
 #include "alpaka/core/Cuda.hpp"
+#include "alpaka/core/CudaSingleThread.hpp"
 #include "alpaka/core/Decay.hpp"
 #include "alpaka/core/DemangleTypeNames.hpp"
 #include "alpaka/core/Hip.hpp"
@@ -173,6 +174,9 @@ namespace alpaka
             using type = TIdx;
         };
 
+        // Aliases
+        using CUDAThread = alpaka::cuda::detail::SingleThread;
+
         //! The CUDA/HIP non-blocking kernel enqueue trait specialization.
         template<typename TApi, typename TAcc, typename TDim, typename TIdx, typename TKernelFnObj, typename... TArgs>
         struct Enqueue<
@@ -256,6 +260,10 @@ namespace alpaka
                 // with std::forward to this function to be of type float instead of e.g. "float const & __ptr64"
                 // (MSVC). If not given by value, the kernel launch code does not copy the value but the pointer to the
                 // value location.
+
+                CUDAThread::postAndReturn<void>([=]() mutable
+                {
+                    
                 std::apply(
                     [&](remove_restrict_t<ALPAKA_DECAY_T(TArgs)> const&... args)
                     {
@@ -266,7 +274,8 @@ namespace alpaka
                             queue.getNativeHandle()>>>(threadElemExtent, task.m_kernelFnObj, args...);
                     },
                     task.m_args);
-
+                }
+                );
                 if constexpr(ALPAKA_DEBUG >= ALPAKA_DEBUG_MINIMAL)
                 {
                     // Wait for the kernel execution to finish but do not check error return of this call.
@@ -359,6 +368,9 @@ namespace alpaka
                 // Set the current device.
                 ALPAKA_UNIFORM_CUDA_HIP_RT_CHECK(TApi::setDevice(queue.m_spQueueImpl->m_dev.getNativeHandle()));
 
+                CUDAThread::postAndReturn<void>([=]() mutable
+                {
+                    
                 // Enqueue the kernel execution.
                 std::apply(
                     [&](remove_restrict_t<ALPAKA_DECAY_T(TArgs)> const&... args)
@@ -370,6 +382,8 @@ namespace alpaka
                             queue.getNativeHandle()>>>(threadElemExtent, task.m_kernelFnObj, args...);
                     },
                     task.m_args);
+                }
+                );
 
                 // Wait for the kernel execution to finish but do not check error return of this call.
                 // Do not use the alpaka::wait method because it checks the error itself but we want to give a custom
