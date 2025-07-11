@@ -12,6 +12,7 @@
 #include <mutex>
 #include <utility>
 #include <thread>
+#include <unistd.h>
 
 namespace alpaka::cuda::detail {
 
@@ -34,9 +35,9 @@ public:
         std::promise<R> promise;
         auto future = promise.get_future();
 
-        std::cout << "Waiting on promise [" << &promise << "] (thread " << std::this_thread::get_id() << ")" << std::endl;
         post([promise_ptr = &promise, func = std::forward<F>(f)]() mutable {
-            std::cout << "Lambda START [" << promise_ptr << "] (thread " << std::this_thread::get_id() << ")" << std::endl;
+            std::cout << "Lambda START [" << promise_ptr << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+                 << "/"  << std::dec << gettid() << ")" << std::endl;
             try {
                 if constexpr (std::is_void_v<R>) {
                     func();
@@ -47,10 +48,23 @@ public:
             } catch (...) {
                 promise_ptr->set_exception(std::current_exception());
             }
-            std::cout << "Lambda END [" << promise_ptr << "] (thread " << std::this_thread::get_id() << ")" << std::endl;
+            std::cout << "Lambda END [" << promise_ptr << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+                 << "/"  << std::dec << gettid() << ")" << std::endl;
         });
 
-        return future.get();
+        std::cout << "Waiting on promise [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+                 << "/"  << std::dec << gettid() << ")" << std::endl;
+        if constexpr (std::is_void_v<R>) {
+            future.wait();
+            std::cout << "Promise fulfilled [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+                     << "/"  << std::dec << gettid() << ")" << std::endl;
+            return;
+        } else { 
+           R ret = future.get();
+           std::cout << "Promise fulfilled [" << &promise << "] (thread 0x" << std::hex << std::this_thread::get_id() 
+                     << "/"  << std::dec << gettid() << ")" << std::endl;
+           return ret;
+        }
     }
 
     ~SingleThread() {
